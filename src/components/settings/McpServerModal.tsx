@@ -13,6 +13,8 @@ import {
 import { ObsidianButton } from '../common/ObsidianButton'
 import { ObsidianSetting } from '../common/ObsidianSetting'
 import { ObsidianTextInput } from '../common/ObsidianTextInput'
+import { TextSelect } from 'lucide-react'
+import { ObsidianDropdown } from '../common/ObsidianDropdown'
 
 function McpServerFormComponent({
   plugin,
@@ -28,6 +30,7 @@ function McpServerFormComponent({
     : undefined
 
   const [name, setName] = useState(existingServer?.id ?? '')
+  const [transportType, setTransportType] = useState(existingServer?.transportType ?? 'stdio')
   const [parameters, setParameters] = useState(
     existingServer ? JSON.stringify(existingServer.parameters, null, 2) : '',
   )
@@ -75,34 +78,33 @@ function McpServerFormComponent({
         .strict()
         .parse(parsedParameters)
 
+      if ((transportType === 'sse' || transportType === 'streamable-http')) {
+        if (!('url' in validatedParameters) || typeof validatedParameters.url !== 'string' || !validatedParameters.url.trim()) {
+          throw new Error('For remote MCP servers, the parameters JSON must include a non-empty "url" field.')
+        }
+      }
+
+      const newServer = {
+        id: serverName,
+        parameters: validatedParameters,
+        toolOptions: {},
+        enabled: true,
+        transportType,
+      }
+
       const newSettings = {
         ...plugin.settings,
         mcp: {
           ...plugin.settings.mcp,
           servers: existingServer
             ? plugin.settings.mcp.servers.map((server) =>
-                server.id === existingServer.id
-                  ? {
-                      ...server,
-                      id: serverName,
-                      parameters: validatedParameters,
-                    }
-                  : server,
+                server.id === existingServer.id ? { ...server, ...newServer } : server,
               )
-            : [
-                ...plugin.settings.mcp.servers,
-                {
-                  id: serverName,
-                  parameters: validatedParameters,
-                  toolOptions: {},
-                  enabled: true,
-                },
-              ],
+            : [...plugin.settings.mcp.servers, newServer],
         },
       }
 
       await plugin.setSettings(newSettings)
-
       onClose()
     } catch (error) {
       if (error instanceof Error) {
@@ -157,7 +159,19 @@ function McpServerFormComponent({
           placeholder="e.g. 'github'"
         />
       </ObsidianSetting>
-
+      
+      <ObsidianSetting name="Transport Type" desc="MCP server connection type" required>
+        <ObsidianDropdown
+          value={transportType}
+          options={{
+            'streamable-http': '远程 Streamable HTTP',
+            stdio: '本地 Stdio',
+            sse: '远程 SSE',
+          }}
+          onChange={(value: string) => setTransportType(value as 'stdio' | 'sse' | 'streamable-http')}
+        />
+      </ObsidianSetting>
+      
       <ObsidianSetting
         name="Parameters"
         desc={`JSON configuration that defines how to run the MCP server. Format must include:

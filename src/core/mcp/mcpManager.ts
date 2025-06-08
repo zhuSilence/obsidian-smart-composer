@@ -183,7 +183,7 @@ export class McpManager {
       throw new McpNotAvailableException()
     }
 
-    const { id: name, parameters: serverParams, enabled } = serverConfig
+    const { id: name, parameters: serverParams, enabled, transportType = 'stdio'} = serverConfig
 
     if (!enabled) {
       return {
@@ -205,33 +205,34 @@ export class McpManager {
     }
 
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
-    const { StdioClientTransport } = await import(
-      '@modelcontextprotocol/sdk/client/stdio.js'
-    )
-    const client = new Client({ name, version: '1.0.0' })
+    let transport: any
 
     try {
-      await client.connect(
-        new StdioClientTransport({
-          ...serverParams,
+      if (transportType === 'stdio') {
+        const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js')
+        transport = new StdioClientTransport({
+          command: serverParams.command!,
+          args: serverParams.args,
           env: {
             ...this.defaultEnv,
             ...(serverParams.env ?? {}),
           },
-        }),
-      )
-    } catch (error) {
-      return {
-        name,
-        config: serverConfig,
-        status: McpServerStatus.Error,
-        error: new Error(
-          `Failed to connect to MCP server ${name}: ${error instanceof Error ? error.message : String(error)}`,
-        ),
+        })
+      } else if (transportType === 'sse') {
+        const { SSEClientTransport } = await import('@modelcontextprotocol/sdk/client/sse.js')
+        if (!serverParams.url) throw new Error('SSE 远程服务器必须配置 url')
+        transport = new SSEClientTransport(new URL(serverParams.url))
+      } else if (transportType === 'streamable-http') {
+        const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
+        if (!serverParams.url) throw new Error('Streamable HTTP 远程服务器必须配置 url')
+        transport = new StreamableHTTPClientTransport(new URL(serverParams.url))
+      } else {
+        throw new Error(`未知的 MCP 传输类型: ${transportType}`)
       }
-    }
 
-    try {
+      const client = new Client({ name, version: '1.0.0' })
+      await client.connect(transport)
+
       const toolList = await client.listTools()
       return {
         name,
@@ -246,7 +247,7 @@ export class McpManager {
         config: serverConfig,
         status: McpServerStatus.Error,
         error: new Error(
-          `Failed to list tools for MCP server ${name}: ${error instanceof Error ? error.message : String(error)}`,
+          `Failed to connect to MCP server ${name}: ${error instanceof Error ? error.message : String(error)}`,
         ),
       }
     }

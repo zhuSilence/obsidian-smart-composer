@@ -7,9 +7,10 @@ export type McpToolCallResult = CallToolResult
 export type McpClient = Client
 
 export const mcpServerParametersSchema = z.object({
-  command: z.string(),
+  command: z.string().optional(),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  url: z.string().optional(),
 })
 export type McpServerParameters = z.infer<typeof mcpServerParametersSchema>
 
@@ -21,11 +22,14 @@ export const mcpServerToolOptionsSchema = z.record(
   }),
 )
 
+export type McpTransportType = 'stdio' | 'sse' | 'streamable-http'
+
 export const mcpServerConfigSchema = z.object({
   id: z.string(),
   parameters: mcpServerParametersSchema,
   enabled: z.boolean(),
   toolOptions: mcpServerToolOptionsSchema,
+  transportType: z.enum(['stdio', 'sse', 'streamable-http']).default('stdio'),
 })
 export type McpServerConfig = z.infer<typeof mcpServerConfigSchema>
 
