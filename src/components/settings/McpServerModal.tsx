@@ -164,9 +164,9 @@ function McpServerFormComponent({
         <ObsidianDropdown
           value={transportType}
           options={{
-            'streamable-http': '远程 Streamable HTTP',
-            stdio: '本地 Stdio',
-            sse: '远程 SSE',
+            'streamable-http': 'Streamable HTTP',
+            stdio: 'Stdio',
+            sse: 'SSE',
           }}
           onChange={(value: string) => setTransportType(value as 'stdio' | 'sse' | 'streamable-http')}
         />
